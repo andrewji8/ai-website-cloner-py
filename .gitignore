@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Playwright
+_original_generated/
+_smoke_artifacts/
+
+# 克隆产物（第三方内容，默认不入库）
+_clones/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
