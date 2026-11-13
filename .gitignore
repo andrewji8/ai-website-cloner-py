@@ -20,3 +20,17 @@ _clones/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# 各 AI 平台生成的指令文件（不入库，本地用 python scripts/sync_agents.py 重新生成）
+# 信源仍入库：AGENTS.md + .claude/skills/clone-website/SKILL.md
+.amazonq/
+.augment/
+.codex/
+.continue/
+.cursor/
+.gemini/
+.github/copilot-instructions.md
+.github/skills/
+.opencode/
+.windsurf/
+.clinerules
