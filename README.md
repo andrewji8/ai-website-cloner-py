@@ -29,7 +29,7 @@ Bash and Node.js.
    / Merge the two Bash+Node sync scripts into one pure-stdlib Python script with identical output.
 
 2. **扩展（Extension）**：新增基于 **Playwright + Chromium** 的可执行抓取/重建器
-   (`cloner/` 包)，把原 `/clone-website` 技能的"侦察 → 提取 → 构建"落地为真正可运行的代码：
+   (`cloner/` 包），把原 `/clone-website` 技能的"侦察 → 提取 → 构建"落地为真正可运行的代码：
    抓取渲染 DOM、多视口截图、提取设计 token、下载并本地化资源、内联 CSS，重生成自包含站点。
    / Add a runnable Playwright + Chromium crawler/rebuilder that captures the rendered DOM,
    screenshots, design tokens, assets, and rebuilds a self-contained static site.
@@ -44,6 +44,15 @@ Bash and Node.js.
 - **真实抓取/重建**：Playwright 打开目标页 → 桌面/移动多视口全页截图 → 提取计算样式
   设计 token（颜色/字体/字号/动效库）→ 并行下载资源并本地化 → 改写 URL → 内联 CSS →
   输出自包含 `index.html` + `research/`。
+- **P0 · 响应式 srcset 本地化**：按逗号拆分 `srcset` 内每张图，逐个下载、改写时保留
+  `w`/`x` 描述符，离线打开不再"裂图"。
+- **P0 · 站点级多页爬取**（`--site`）：同域 BFS 抓取多页，共享 `assets/`，
+  跨页 `<a>` 链接改写为相对路径，输出 `pages/` 或按 URL 路径映射的独立 HTML。
+- **P1 · 下载审计清单**：`research/download-failures.json` 如实记录每个失败资源
+  （HTTP 状态码 / 异常类型 / URL），便于审计"哪些没下下来"。
+- **P1 · 路由数据本地化**：不再跳过 `.json`，可本地化 Next.js 等框架直接引用的路由数据。
+- **P2 · 交互状态采集**（`--state LABEL=SELECTOR`）：点击选择器后截图 + 抓 HTML，
+  覆盖菜单/弹窗/tab 等"初始渲染之外"的状态。
 - **健壮性**：并行下载、短超时、资源数量上限、`domcontentloaded` 兜底，可处理大型企业站。
 
 ---
@@ -58,10 +67,11 @@ cloner/                               # 抓取/重建包 (Playwright)
   assets.py  tokens.py  crawl.py  build.py  cli.py  __init__.py
 scripts/
   sync_agents.py         # 等价替换 sync-agent-rules.sh + sync-skills.mjs
-  clone_site.py          # CLI：抓取并重建一个网站
+  clone_site.py          # CLI：抓取并重建一个网站（单页 / --site 多页）
+  verify_clone.py        # 离线验证产物：srcset/链接/状态/失败审计
   smoke_playwright.py    # 冒烟：Chromium 启动/导航/截图
   test_sync_agents.py    # 校验 13 个同步产物
-  test_cloner_imports.py # 校验 cloner 包语法与资产模块
+  test_cloner_imports.py # 校验 cloner 包语法 + P0/P1/P2 资产函数冒烟
 README.md  docs/  LICENSE  requirements.txt  pyproject.toml
 _original_generated/  # (git 忽略) 原仓库输出对照物
 _clones/              # (git 忽略) 克隆产物输出目录
@@ -83,10 +93,17 @@ python scripts/sync_agents.py
 
 # 3) 抓取并重建一个网站 / clone & rebuild a site
 python scripts/clone_site.py https://example.com
+# 站点级多页爬取 / whole-site crawl
+python scripts/clone_site.py https://example.com --site --max-pages 10
+# 交互状态采集 / capture interaction states
+python scripts/clone_site.py https://example.com --state "menu=button.header-menu"
 # 预览 / preview
 python scripts/clone_site.py https://example.com --serve
 
-# 4) 运行测试 / run tests
+# 4) 离线验证产物 / verify the offline build
+python scripts/verify_clone.py _clones/<host>_<ts>
+
+# 5) 运行测试 / run tests
 python scripts/test_sync_agents.py
 python scripts/test_cloner_imports.py
 ```
@@ -98,11 +115,15 @@ python scripts/test_cloner_imports.py
 
 ## 五、已知限制 / Known Limitations
 
-- 抓取仅覆盖**单页**（当前实现）；未递归整站爬取。
+- **单页模式仍是最小可用单元**；站点级 `--site` 默认上限 25 页（`--max-pages` 可调），
+  且只爬**可静态解析**的同域 `<a>` 链接。
+- **重 JS 应用的动态内容**（商品数据、价格、库存等由后端 API/GraphQL 驱动的部分）
+  在离线静态镜像中**不可用**——页面停留在快照那一刻的服务端渲染状态。
+- **防盗链 / 反爬 CDN**（如 `img.lilysilk.com` 对直连 urllib 返回 403/404）会导致部分资源
+  下载失败；这些会如实记录在 `research/download-failures.json`，不会静默吞掉。
 - 第三方分析/跟踪脚本（GTM、Adobe Analytics 等）通常无法在离线重建中运行，
   重建页面中会保留它们的远程引用。
 - 个体会员/登录内容无法抓取（受登录态与 ToS 约束）。
-- 失败资源会被跳过并在 `research/manifest.json` 中如实反映；个别响应可能为 0 字节。
 
 ---
 
